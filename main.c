@@ -22,10 +22,10 @@ int main(int argc, char *argv[])
    struct scaler_ctx ctx = {
       .in_width    = imlib_image_get_width(),
       .in_height   = imlib_image_get_height(),
-      .out_width   = imlib_image_get_width() / 2,
-      .out_height  = imlib_image_get_height() / 2,
+      .out_width   = imlib_image_get_width() * 2,
+      .out_height  = imlib_image_get_height() * 2,
       .in_stride   = imlib_image_get_width() * sizeof(uint32_t),
-      .out_stride  = imlib_image_get_width() / 2 * sizeof(uint32_t),
+      .out_stride  = imlib_image_get_width() * 2 * sizeof(uint32_t),
       .in_fmt      = SCALER_FMT_ARGB8888,
       .out_fmt     = SCALER_FMT_ARGB8888,
       .scaler_type = SCALER_TYPE_SINC,
