@@ -10,6 +10,7 @@
 
 #define FILTER_UNITY (1 << 14)
 
+// In case aligned allocs are needed later ...
 static void *scaler_alloc(size_t elem_size, size_t size)
 {
    return calloc(elem_size, size);
