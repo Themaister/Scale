@@ -22,10 +22,10 @@ int main(int argc, char *argv[])
    struct scaler_ctx ctx = {
       .in_width    = imlib_image_get_width(),
       .in_height   = imlib_image_get_height(),
-      .out_width   = imlib_image_get_width() * 4,
-      .out_height  = imlib_image_get_height() * 4,
+      .out_width   = imlib_image_get_width() / 2,
+      .out_height  = imlib_image_get_height() / 2,
       .in_stride   = imlib_image_get_width() * sizeof(uint32_t),
-      .out_stride  = imlib_image_get_width() * 4 * sizeof(uint32_t),
+      .out_stride  = imlib_image_get_width() / 2 * sizeof(uint32_t),
       .in_fmt      = SCALER_FMT_ARGB8888,
       .out_fmt     = SCALER_FMT_ARGB8888,
       .scaler_type = SCALER_TYPE_SINC,
@@ -33,9 +33,9 @@ int main(int argc, char *argv[])
 
    assert(scaler_ctx_gen_filter(&ctx));
 
-   uint32_t *scale_buf = calloc(sizeof(uint32_t), ctx.out_width * ctx.out_height * 4 * 4);
+   uint32_t *scale_buf = calloc(sizeof(uint32_t), ctx.out_width * ctx.out_height);
 
-   for (unsigned i = 0; i < 10; i++)
+   for (unsigned i = 0; i < 4; i++)
    {
       struct timespec tv[2];
       clock_gettime(CLOCK_MONOTONIC, &tv[0]);

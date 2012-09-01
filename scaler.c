@@ -139,7 +139,6 @@ static void scaler_argb8888_horiz(const struct scaler_ctx *ctx, const void *inpu
             res = _mm_adds_epi16(_mm_mulhi_epi16(col, coeff), res);
          }
 
-
          for (; x < ctx->horiz.filter_len; x++)
          {
             __m128i coeff = _mm_set_epi64x(0, filter_horiz[x] * 0x0001000100010001ll);
@@ -198,6 +197,15 @@ static bool allocate_filters(struct scaler_ctx *ctx)
    return true;
 }
 
+static void gen_filter_point_sub(struct scaler_filter *filter, int len, int pos, int step)
+{
+   for (int i = 0; i < len; i++, pos += step)
+   {
+      filter->filter_pos[i] = pos >> 16;
+      filter->filter[i]     = FILTER_UNITY;
+   }
+}
+
 static bool gen_filter_point(struct scaler_ctx *ctx)
 {
    ctx->horiz.filter_len    = 1;
@@ -213,19 +221,20 @@ static bool gen_filter_point(struct scaler_ctx *ctx)
    int y_pos  = (1 << 15) * ctx->in_height / ctx->out_height - (1 << 15);
    int y_step = (1 << 16) * ctx->in_height / ctx->out_height;
 
-   for (int i = 0; i < ctx->out_width; i++, x_pos += x_step)
-   {
-      ctx->horiz.filter_pos[i] = x_pos >> 16;
-      ctx->horiz.filter[i]     = FILTER_UNITY;
-   }
+   gen_filter_point_sub(&ctx->horiz, ctx->out_width, x_pos, x_step);
+   gen_filter_point_sub(&ctx->vert, ctx->out_height, y_pos, y_step);
 
-   for (int i = 0; i < ctx->out_height; i++, y_pos += y_step)
-   {
-      ctx->vert.filter_pos[i] = y_pos >> 16;
-      ctx->vert.filter[i]     = FILTER_UNITY;
-   }
-   
    return true;
+}
+
+static void gen_filter_bilinear_sub(struct scaler_filter *filter, int len, int pos, int step)
+{
+   for (int i = 0; i < len; i++, pos += step)
+   {
+      filter->filter_pos[i]     = pos >> 16;
+      filter->filter[i * 2 + 1] = (pos & 0xffff) >> 2;
+      filter->filter[i * 2 + 0] = FILTER_UNITY - filter->filter[i * 2 + 1];
+   }
 }
 
 static bool gen_filter_bilinear(struct scaler_ctx *ctx)
@@ -243,19 +252,8 @@ static bool gen_filter_bilinear(struct scaler_ctx *ctx)
    int y_pos  = (1 << 15) * ctx->in_height / ctx->out_height - (1 << 15);
    int y_step = (1 << 16) * ctx->in_height / ctx->out_height;
 
-   for (int i = 0; i < ctx->out_width; i++, x_pos += x_step)
-   {
-      ctx->horiz.filter_pos[i]     = x_pos >> 16;
-      ctx->horiz.filter[i * 2 + 1] = (x_pos & 0xffff) >> 2;
-      ctx->horiz.filter[i * 2 + 0] = FILTER_UNITY - ctx->horiz.filter[i * 2 + 1];
-   }
-
-   for (int i = 0; i < ctx->out_height; i++, y_pos += y_step)
-   {
-      ctx->vert.filter_pos[i]     = y_pos >> 16;
-      ctx->vert.filter[i * 2 + 1] = (y_pos & 0xffff) >> 2;
-      ctx->vert.filter[i * 2 + 0] = FILTER_UNITY - ctx->vert.filter[i * 2 + 1];
-   }
+   gen_filter_bilinear_sub(&ctx->horiz, ctx->out_width, x_pos, x_step);
+   gen_filter_bilinear_sub(&ctx->horiz, ctx->out_height, y_pos, y_step);
 
    return true;
 }
@@ -268,48 +266,63 @@ static inline double sinc(double phase)
       return sin(phase) / phase;
 }
 
+static inline unsigned next_pow2(unsigned v)
+{
+   v--;
+   v |= v >> 1;
+   v |= v >> 2;
+   v |= v >> 4;
+   v |= v >> 8;
+   v |= v >> 16;
+   v++;
+
+   return v;
+}
+
+static void gen_filter_sinc_sub(struct scaler_filter *filter, int len, int pos, int step, double phase_mul)
+{
+   const int sinc_size = filter->filter_len;
+
+   for (int i = 0; i < len; i++, pos += step)
+   {
+      filter->filter_pos[i] = pos >> 16;
+
+      //int16_t sinc_sum = 0;
+      for (int j = 0; j < sinc_size; j++)
+      {
+         double sinc_phase    = M_PI * ((double)((sinc_size << 15) + (pos & 0xffff)) / 0x10000 - j);
+         double lanczos_phase = sinc_phase / ((sinc_size >> 1));
+         int16_t sinc_val     = FILTER_UNITY * sinc(sinc_phase * phase_mul) * sinc(lanczos_phase) * phase_mul;
+         //sinc_sum += sinc_val;
+
+         filter->filter[i * sinc_size + j] = sinc_val;
+      }
+      //fprintf(stderr, "Sinc sum = %.3lf\n", (double)sinc_sum / FILTER_UNITY);
+   }
+}
+
 static bool gen_filter_sinc(struct scaler_ctx *ctx)
 {
-   ctx->horiz.filter_len    = 8;
-   ctx->horiz.filter_stride = 8;
-   ctx->vert.filter_len     = 8;
-   ctx->vert.filter_stride  = 8;
+   // Need to expand the filter when downsampling to get a proper low-pass effect.
+   const int sinc_size      = 8 * (ctx->in_width > ctx->out_width ? next_pow2(ctx->in_width / ctx->out_width) : 1);
+   ctx->horiz.filter_len    = sinc_size;
+   ctx->horiz.filter_stride = sinc_size;
+   ctx->vert.filter_len     = sinc_size;
+   ctx->vert.filter_stride  = sinc_size;
 
    if (!allocate_filters(ctx))
       return false;
 
-   int x_pos  = (1 << 15) * ctx->in_width / ctx->out_width - (1 << 15) - 3;
+   int x_pos  = (1 << 15) * ctx->in_width / ctx->out_width - (1 << 15) - (sinc_size << 15);
    int x_step = (1 << 16) * ctx->in_width / ctx->out_width;
-   int y_pos  = (1 << 15) * ctx->in_height / ctx->out_height - (1 << 15) - 3;
+   int y_pos  = (1 << 15) * ctx->in_height / ctx->out_height - (1 << 15) - (sinc_size << 15);
    int y_step = (1 << 16) * ctx->in_height / ctx->out_height;
 
-   for (int i = 0; i < ctx->out_width; i++, x_pos += x_step)
-   {
-      ctx->horiz.filter_pos[i] = x_pos >> 16;
+   double phase_mul_horiz = ctx->in_width  > ctx->out_width  ? (double)ctx->out_width  / ctx->in_width  : 1.0;
+   double phase_mul_vert  = ctx->in_height > ctx->out_height ? (double)ctx->out_height / ctx->in_height : 1.0;
 
-      for (int j = 0; j < 8; j++)
-      {
-         double sinc_phase    = M_PI * ((double)(3 + (x_pos & 0xffff)) / 0x10000 - j);
-         double lanczos_phase = sinc_phase / 2.0;
-         int16_t sinc_val     = FILTER_UNITY * sinc(sinc_phase) * sinc(lanczos_phase);
-
-         ctx->horiz.filter[i * 8 + j] = sinc_val;
-      }
-   }
-
-   for (int i = 0; i < ctx->out_height; i++, y_pos += y_step)
-   {
-      ctx->vert.filter_pos[i] = y_pos >> 16;
-
-      for (int j = 0; j < 8; j++)
-      {
-         double sinc_phase    = M_PI * ((double)(3 + (y_pos & 0xffff)) / 0x10000 - j);
-         double lanczos_phase = sinc_phase / 2.0;
-         int16_t sinc_val     = FILTER_UNITY * sinc(sinc_phase) * sinc(lanczos_phase);
-
-         ctx->vert.filter[i * 8 + j] = sinc_val;
-      }
-   }
+   gen_filter_sinc_sub(&ctx->horiz, ctx->out_width, x_pos, x_step, phase_mul_horiz);
+   gen_filter_sinc_sub(&ctx->vert, ctx->out_height, y_pos, y_step, phase_mul_vert);
 
    return true;
 }
