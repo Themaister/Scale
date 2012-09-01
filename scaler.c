@@ -253,7 +253,7 @@ static bool gen_filter_bilinear(struct scaler_ctx *ctx)
    int y_step = (1 << 16) * ctx->in_height / ctx->out_height;
 
    gen_filter_bilinear_sub(&ctx->horiz, ctx->out_width, x_pos, x_step);
-   gen_filter_bilinear_sub(&ctx->horiz, ctx->out_height, y_pos, y_step);
+   gen_filter_bilinear_sub(&ctx->vert, ctx->out_height, y_pos, y_step);
 
    return true;
 }
