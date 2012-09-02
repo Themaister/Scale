@@ -2,7 +2,7 @@
 
 void conv_0rgb1555_argb8888(const struct scaler_ctx *ctx, const void *input_)
 {
-   const uint16_t *input = input_;
+   const uint16_t *input = (const uint16_t*)input_;
    uint32_t *output = ctx->input.frame;
 
    for (int h = 0; h < ctx->in_height; h++, output += ctx->input.stride >> 2, input += ctx->in_stride >> 1)
@@ -24,7 +24,7 @@ void conv_0rgb1555_argb8888(const struct scaler_ctx *ctx, const void *input_)
 
 void conv_bgr24_argb8888(const struct scaler_ctx *ctx, const void *input_)
 {
-   const uint8_t *input = input_;
+   const uint8_t *input = (const uint8_t*)input_;
    uint32_t *output = ctx->input.frame;
 
    for (int h = 0; h < ctx->in_height; h++, output += ctx->input.stride >> 2, input += ctx->in_stride)
@@ -43,7 +43,7 @@ void conv_bgr24_argb8888(const struct scaler_ctx *ctx, const void *input_)
 void conv_argb8888_0rgb1555(const struct scaler_ctx *ctx, void *output_)
 {
    const uint32_t *input = ctx->output.frame;
-   uint16_t *output = output_;
+   uint16_t *output = (uint16_t*)output_;
 
    for (int h = 0; h < ctx->out_height; h++, output += ctx->out_stride >> 1, input += ctx->output.stride >> 2)
    {
@@ -61,7 +61,7 @@ void conv_argb8888_0rgb1555(const struct scaler_ctx *ctx, void *output_)
 void conv_argb8888_bgr24(const struct scaler_ctx *ctx, void *output_)
 {
    const uint32_t *input = ctx->output.frame;
-   uint8_t *output = output_;
+   uint8_t *output = (uint8_t*)output_;
 
    for (int h = 0; h < ctx->out_height; h++, output += ctx->out_stride, input += ctx->output.stride >> 2)
    {

@@ -122,21 +122,20 @@ int main(int argc, char *argv[])
 
    imlib_context_set_image(img);
 
-   struct scaler_ctx ctx = {
-      .in_width    = imlib_image_get_width(),
-      .in_height   = imlib_image_get_height(),
-      .out_width   = (int)(imlib_image_get_width() * g_horiz_scale),
-      .out_height  = (int)(imlib_image_get_height() * g_vert_scale),
-      .in_stride   = imlib_image_get_width() * sizeof(uint32_t),
-      .out_stride  = (int)(imlib_image_get_width() * g_horiz_scale) * sizeof(uint32_t),
-      .in_fmt      = SCALER_FMT_ARGB8888,
-      .out_fmt     = SCALER_FMT_ARGB8888,
-      .scaler_type = g_scaler_type,
-   };
+   struct scaler_ctx ctx = {0};
+   ctx.in_width    = imlib_image_get_width();
+   ctx.in_height   = imlib_image_get_height();
+   ctx.out_width   = (int)(imlib_image_get_width() * g_horiz_scale);
+   ctx.out_height  = (int)(imlib_image_get_height() * g_vert_scale);
+   ctx.in_stride   = imlib_image_get_width() * sizeof(uint32_t);
+   ctx.out_stride  = (int)(imlib_image_get_width() * g_horiz_scale) * sizeof(uint32_t);
+   ctx.in_fmt      = SCALER_FMT_ARGB8888;
+   ctx.out_fmt     = SCALER_FMT_ARGB8888;
+   ctx.scaler_type = g_scaler_type;
 
    assert(scaler_ctx_gen_filter(&ctx));
 
-   uint32_t *scale_buf = calloc(sizeof(uint32_t), ctx.out_width * ctx.out_height);
+   uint32_t *scale_buf = (uint32_t*)calloc(sizeof(uint32_t), ctx.out_width * ctx.out_height);
 
    //struct timespec tv[2];
    //clock_gettime(CLOCK_MONOTONIC, &tv[0]);

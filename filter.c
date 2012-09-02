@@ -5,11 +5,11 @@
 
 static bool allocate_filters(struct scaler_ctx *ctx)
 {
-   ctx->horiz.filter     = scaler_alloc(sizeof(int16_t), ctx->horiz.filter_stride * ctx->out_width);
-   ctx->horiz.filter_pos = scaler_alloc(sizeof(int), ctx->out_width);
+   ctx->horiz.filter     = (int16_t*)scaler_alloc(sizeof(int16_t), ctx->horiz.filter_stride * ctx->out_width);
+   ctx->horiz.filter_pos = (int*)scaler_alloc(sizeof(int), ctx->out_width);
 
-   ctx->vert.filter      = scaler_alloc(sizeof(int16_t), ctx->vert.filter_stride * ctx->out_height);
-   ctx->vert.filter_pos  = scaler_alloc(sizeof(int), ctx->out_height);
+   ctx->vert.filter      = (int16_t*)scaler_alloc(sizeof(int16_t), ctx->vert.filter_stride * ctx->out_height);
+   ctx->vert.filter_pos  = (int*)scaler_alloc(sizeof(int), ctx->out_height);
 
    return ctx->horiz.filter && ctx->vert.filter;
 }
@@ -185,7 +185,7 @@ static void fixup_filter_sub(struct scaler_filter *filter, int out_len, int in_l
 
          int16_t *base_filter = filter->filter + i * filter->filter_stride;
 
-         if (postsample > filter->filter_len)
+         if (postsample > (int)filter->filter_len)
             memset(base_filter, 0, filter->filter_len * sizeof(int16_t));
          else
          {
@@ -199,8 +199,13 @@ static void fixup_filter_sub(struct scaler_filter *filter, int out_len, int in_l
          filter->filter_pos[i] += presample;
          int16_t *base_filter = filter->filter + i * filter->filter_stride;
 
-         memmove(base_filter, base_filter + presample, (filter->filter_len - presample) * sizeof(int16_t));
-         memset(base_filter + (filter->filter_len - presample), 0, presample * sizeof(int16_t));
+         if (presample > (int)filter->filter_len)
+            memset(base_filter, 0, filter->filter_len * sizeof(int16_t));
+         else
+         {
+            memmove(base_filter, base_filter + presample, (filter->filter_len - presample) * sizeof(int16_t));
+            memset(base_filter + (filter->filter_len - presample), 0, presample * sizeof(int16_t));
+         }
       }
    }
 }
