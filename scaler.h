@@ -49,11 +49,11 @@ struct scaler_ctx
    void (*scaler_vert)(const struct scaler_ctx*,
          void*, int);
 
-   void (*in_pixconv)(const struct scaler_ctx*,
-         const void*);
-   void (*out_pixconv)(const struct scaler_ctx*,
-         void*);
+   void (*in_pixconv)(void*, const void*, int, int, int, int);
+   void (*out_pixconv)(void*, const void*, int, int, int, int);
+   void (*direct_pixconv)(void*, const void*, int, int, int, int);
 
+   bool unscaled;
    struct scaler_filter horiz, vert;
 
    struct
