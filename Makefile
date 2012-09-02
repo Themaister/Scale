@@ -3,7 +3,7 @@ TARGET := scale
 SOURCES := $(wildcard *.c)
 OBJECTS := $(SOURCES:.c=.o)
 LIBS := $(shell pkg-config imlib2 --libs) -lm
-CFLAGS += $(shell pkg-config imlib2 --cflags) -O3 -ffast-math -g -Wall -pedantic -std=gnu99 -march=native
+CFLAGS += $(shell pkg-config imlib2 --cflags) -O3 -ffast-math -g -Wall -pedantic -std=gnu99 -march=native -DUSE_SIMD
 
 $(TARGET): $(OBJECTS)
 	$(CC) -o $@ $^ $(LIBS)

@@ -5,9 +5,13 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#define FILTER_UNITY (1 << 14)
+
 enum scaler_pix_fmt
 {
-   SCALER_FMT_ARGB8888 = 0
+   SCALER_FMT_ARGB8888 = 0,
+   SCALER_FMT_0RGB1555,
+   SCALER_FMT_BGR24
 };
 
 enum scaler_type
@@ -41,11 +45,22 @@ struct scaler_ctx
    enum scaler_type scaler_type;
 
    void (*scaler_horiz)(const struct scaler_ctx*,
-         const void*);
+         const void*, int);
    void (*scaler_vert)(const struct scaler_ctx*,
+         void*, int);
+
+   void (*in_pixconv)(const struct scaler_ctx*,
+         const void*);
+   void (*out_pixconv)(const struct scaler_ctx*,
          void*);
 
    struct scaler_filter horiz, vert;
+
+   struct
+   {
+      uint32_t *frame;
+      int stride;
+   } input;
 
    struct
    {
@@ -54,6 +69,12 @@ struct scaler_ctx
       int height;
       int stride;
    } scaled;
+
+   struct
+   {
+      uint32_t *frame;
+      int stride;
+   } output;
 };
 
 bool scaler_ctx_gen_filter(struct scaler_ctx *ctx);
@@ -61,6 +82,9 @@ void scaler_ctx_gen_reset(struct scaler_ctx *ctx);
 
 void scaler_ctx_scale(const struct scaler_ctx *ctx,
       void *output, const void *input);
+
+void *scaler_alloc(size_t elem_size, size_t size);
+void scaler_free(void *ptr);
 
 #endif
 
